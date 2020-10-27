@@ -1,5 +1,31 @@
---primitives = require "primitives"
+-- MIT License
+-- Copyright (c) 2020 Nexusware Pty Ltd
+-- Permission is hereby granted, free of charge, to any person obtaining a copy
+-- of this software and associated documentation files (the "Software"), to deal
+-- in the Software without restriction, including without limitation the rights
+-- to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+-- copies of the Software, and to permit persons to whom the Software is
+-- furnished to do so, subject to the following conditions:
+
+-- The above copyright notice and this permission notice shall be included in all
+-- copies or substantial portions of the Software.
+
+-- THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+-- IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+-- FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+-- AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+-- LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+-- OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+-- SOFTWARE.
+
 local primitives = {}
+local lang
+local sensors = {}
+local isInit = false
+local sensorsAvailable = {}
+local battery = { cells = 3, capacity = 2200 }
+
+local ren = lcd.renderer()
 
 function primitives.g2Points(ren, iMin, iMax, offsetX, offsetY, width, height, radius)
     local startP
@@ -213,17 +239,8 @@ function primitives.renderCellGraph(ren, offsetX, offsetY, width, height, cells,
     end
 end
 
-local lang
-local sensors = {}
-local isInit = false
-local sensorsAvailable = {}
-local battery = { cells = 3, capacity = 2200 }
-
-local ren = lcd.renderer()
-
 -- Configure language settings
 local function setLanguage()
-    -- Set language
     local lng=system.getLocale();
     local file = io.readall("Apps/HudGauge/locale.jsn")
     local obj = json.decode(file)  
@@ -435,19 +452,16 @@ end
 local function getSensors()
     --- MUI
     if (sensors.mui.id ~= 0) then
-        --local v = { valid = true, value = 11.1 }
         local v = system.getSensorByID(sensors.mui.id, 1)
         if (v and v.valid) then
             sensors.mui.values.voltage = v.value
             sensors.mui.valid = true
         end
-        --local a = {valid = true, value = 50.0}
         local a = system.getSensorByID(sensors.mui.id, 2)
         if (a and a.valid) then
             sensors.mui.values.current = a.value
             sensors.mui.valid = true
         end
-        --local c = {valid = true, value = 500}
         local c = system.getSensorByID(sensors.mui.id, 3)
         if (v and v.valid) then
             sensors.mui.values.capacity = c.value
@@ -460,7 +474,6 @@ local function getSensors()
         sensors.mul6s.values = {}
         local cellSum = 0
         for i = 1,6 do
-            --local sensor = { valid=true, value=3.7 }
             local sensor = system.getSensorByID(sensors.mul6s.id, i)
             if sensor and sensor.valid then
                 sensors.mul6s.values[#sensors.mul6s.values + 1] = sensor.value
