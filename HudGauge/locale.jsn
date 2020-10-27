@@ -1,0 +1,8 @@
+{
+  "default":"en",
+  "en":{
+    "appName":"Hud Gauges",
+    "cfgName":"Hud Gauges Settings",
+    "selectSensor":"Select sensor"
+  }
+}
