@@ -50,21 +50,20 @@ function primitives.g2Points(ren, iMin, iMax, offsetX, offsetY, width, height, r
 end
 
 function primitives.renderGauge2(ren, tMin, tMax, offsetX, offsetY, width, height,  
-    sensorValue, sensorValueMax, format, label, flag, flagLabel)
+    sensorValue, sensorValueMin, sensorValueMax, format, label, flag, flagLabel)
 
     local pcnt = 0
-    if (sensorValue ~= nil and sensorValueMax ~= nil and sensorValueMax > 0) then
-        pcnt = math.floor(sensorValue / sensorValueMax * 100)
+    if (sensorValue ~= nil and sensorValueMax ~= nil and sensorValueMin ~= nil) then
+        pcnt = math.floor((sensorValue - sensorValueMin) / (sensorValueMax - sensorValueMin) * 100)
     end
-
-    local thickness = math.floor(width * 0.15)
-    local radius = (math.min(width, height) - thickness - 4) / 2
-    local t = math.floor(tMin + pcnt * (tMax - tMin) / 100)
-
     if (pcnt < 0) then
         pcnt = 0
     end
     pcnt = math.min(pcnt, 100)
+
+    local thickness = math.floor(width * 0.15)
+    local radius = (math.min(width, height) - thickness - 4) / 2
+    local t = math.floor(tMin + pcnt * (tMax - tMin) / 100)
 
     if (pcnt > 0) then
         ren:reset()
@@ -412,15 +411,16 @@ local function renderTelemetry(width, height)
         end
     end
 
-    primitives.renderGauge2(ren, 90, 330, 0, 0, szX, szY, sensors.rpm.value, 3600, "%.0f", "RPM", govOn, "GOV")
-    primitives.renderGauge2(ren, 90, 330, szX, 0, szX, szY, sensors.throttle.value, 100, "%.1f", "Thr%", false, "")
-    primitives.renderGauge2(ren, 90, 330, 0, szY, szX, szY, sensors.temp.value, 100, "%.1f°C", "ESC Temp", false, "")
-    primitives.renderGauge2(ren, 90, 330, szX, szY, szX, szY, sensors.becV.value, 10, "%.1fV", "BEC V", false, "")
+    primitives.renderGauge2(ren, 90, 330, 0, 0, szX, szY, sensors.rpm.value, 0, 3600, "%.0f", "RPM", govOn, "GOV")
+    primitives.renderGauge2(ren, 90, 330, szX, 0, szX, szY, sensors.throttle.value, 0, 100, "%.1f", "Thr%", false, "")
+    primitives.renderGauge2(ren, 90, 330, 0, szY, szX, szY, sensors.temp.value, 20, 120, "%.1f°C", "ESC Temp", false, "")
+    primitives.renderGauge2(ren, 90, 330, szX, szY, szX, szY, sensors.becV.value, 0, 10, "%.1fV", "BEC V", false, "")
 
     local cellVal = {}
     local cellAvg = 0
     local vVal = 0
     local vMax = 0
+    local vMin = 0
     local escAVal = 0
     local escAMax = battery.escMaxA
     local battcX = szX * 3 + szX / 2
@@ -438,14 +438,16 @@ local function renderTelemetry(width, height)
         cellAvg = sensors.mul6s.total / sensors.mul6s.cellCount, 0.07
         primitives.renderCellGraph(ren, szX * 3, 0, szX / 2, szY * 2, cellVal, cellAvg, 0.07)
         vMax = sensors.mul6s.cellCount * 4.2
+        vMin = sensors.mul6s.cellCount * 3.4
     else 
         vMax = battery.cellCount * 4.2
+        vMin = battery.cellCount * 3.4
         battcX = szX * 3
         battszX = szX
     end
 
-    primitives.renderGauge2(ren, 90, 330, szX * 2, 0, szX, szY, vVal, vMax, "%.1fV", "ESC V", false, "") 
-    primitives.renderGauge2(ren, 90, 330, szX * 2, szY, szX, szY, escAVal, escAMax, "%.1fA", "ESC A", false, "") 
+    primitives.renderGauge2(ren, 90, 330, szX * 2, 0, szX, szY, vVal, vMin, vMax, "%.1fV", "ESC V", false, "") 
+    primitives.renderGauge2(ren, 90, 330, szX * 2, szY, szX, szY, escAVal, 0, escAMax, "%.1fA", "ESC A", false, "") 
     primitives.renderBatteryGauge(ren, battcX, 0, battszX, szY * 2, batVal, batMax)
 end
 
@@ -463,7 +465,7 @@ local function getSensors()
             sensors.mui.valid = true
         end
         local c = system.getSensorByID(sensors.mui.id, 3)
-        if (v and v.valid) then
+        if (c and c.valid) then
             sensors.mui.values.capacity = c.value
             sensors.mui.valid = true
         end
