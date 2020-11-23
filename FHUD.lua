@@ -24,6 +24,8 @@ local sensors = {}
 local isInit = false
 local sensorsAvailable = {}
 local battery = { cells = 3, capacity = 2200 }
+local lipoMax = 4.2
+local lipoMin = 3.2
 
 local ren = lcd.renderer()
 
@@ -97,18 +99,18 @@ function primitives.renderGauge2(ren, tMin, tMax, offsetX, offsetY, width, heigh
     local cX = offsetX + width / 2 - width / 5
     local cY = offsetY + height / 2
     local sX = radius + thickness / 2 + width / 5
-    local sY = lcd.getTextHeight(FONT_NORMAL, sensorValText)
+    local sY = lcd.getTextHeight(FONT_NORMAL)
     primitives.drawTextBox(ren, sensorValText, cX, cY, sX, sY)
 
     lcd.drawText(
         cX + sX - lcd.getTextWidth(FONT_MINI, label), 
-        cY - sY - lcd.getTextHeight(FONT_MINI, label), 
+        cY - sY - lcd.getTextHeight(FONT_MINI), 
         label, FONT_MINI)
     
     if (flag ~= nil and flag == true) then
         lcd.drawText(
             cX, 
-            cY + sY - lcd.getTextHeight(FONT_MINI, flagLabel), 
+            cY + sY - lcd.getTextHeight(FONT_MINI), 
             flagLabel, FONT_MINI)
     end
     
@@ -126,7 +128,7 @@ function primitives.drawTextBox(ren, text, cX, cY, width, height)
     ren:addPoint(cX, cY)
     ren:renderPolyline(1)
 
-    local txtHeight = lcd.getTextHeight(FONT_NORMAL, text)
+    local txtHeight = lcd.getTextHeight(FONT_NORMAL)
     lcd.drawText(
         cX + width - lcd.getTextWidth(FONT_NORMAL, text), 
         cY - txtHeight, 
@@ -157,11 +159,76 @@ function primitives.renderBatteryGauge(ren, offsetX, offsetY, width, height,
     ren:addPoint(cX, cY + sY)
     ren:renderPolygon()
 
+    ren:reset()
     ren:addPoint(cX, cY + sY)
-    ren:addPoint(cX, cY + sY - sY * v)
-    ren:addPoint(cX + sX, cY + sY - sY * v)
+    ren:addPoint(cX, cY)
+    ren:addPoint(cX + sX, cY)
     ren:addPoint(cX + sX, cY + sY)
     ren:addPoint(cX, cY + sY)
+    lcd.setColor(0,0,0)
+    ren:renderPolyline(1)
+
+    ren:reset()
+    ren:addPoint(cX + sX / 4, cY)
+    ren:addPoint(cX + 3 * sX / 4, cY)
+    ren:addPoint(cX + 3 * sX / 4, cY - tip)
+    ren:addPoint(cX + sX / 4, cY - tip)
+    ren:addPoint(cX + sX / 4, cY)
+    ren:renderPolygon()
+
+    local text = string.format("%.0f%%", math.floor(v * 100))
+    local textHeight = lcd.getTextHeight(FONT_MINI)
+    local textWidth = lcd.getTextWidth(FONT_MINI, text)
+    lcd.drawText(cX + (sX - textWidth) / 2, cY + sY - textHeight, text, FONT_MINI)
+end
+
+function primitives.renderBatteryCellGauge(ren, offsetX, offsetY, width, height, 
+    totalVoltage, noOfCells, largestDiff, weakestCell)
+    ren:reset()
+    lcd.setColor(lcd.getFgColor())
+    local textHeight = lcd.getTextHeight(FONT_MINI)
+
+    local v1 = 0
+	local cellAvg = 0
+	local range = lipoMax - lipoMin
+    if (totalVoltage ~= nil and noOfCells ~= nil) then
+        cellAvg = totalVoltage / noOfCells
+        v1 = (cellAvg - lipoMin) / range
+		if (v1 < 0) then 
+			v1 = 0
+		end
+		v1 = math.min(1.0, v1)
+    end
+    local v2 = 0
+    if (largestDiff ~= nil) then
+        v2 = math.min(1.0, largestDiff / 0.3 / 4)
+    end
+
+    local pad = 5
+    local tip = 6
+    local cX = offsetX + pad
+    local cY = offsetY + pad + tip
+    local sX = width - 2 * pad
+    local sY = height - 2 * pad - 1
+    local barLow = v1 - v2
+
+    local s2 = sY * barLow
+    ren:addPoint(cX, cY + sY)
+    ren:addPoint(cX, cY + sY - s2)
+    ren:addPoint(cX + sX, cY + sY - s2)
+    ren:addPoint(cX + sX, cY + sY)
+    ren:addPoint(cX, cY + sY)
+    ren:renderPolygon()
+
+    ren:reset()
+    lcd.setColor(0,0,0)
+    local s1 = sY * v2
+    ren:addPoint(cX, cY + sY - s2)
+    ren:addPoint(cX, cY + sY - s2 - s1)
+    ren:addPoint(cX + sX, cY + sY - s2 - s1)
+    ren:addPoint(cX + sX, cY + sY - s2)
+    ren:addPoint(cX, cY + sY - s2)
+    ren:renderPolygon()
 
     ren:reset()
     ren:addPoint(cX, cY + sY)
@@ -179,6 +246,13 @@ function primitives.renderBatteryGauge(ren, offsetX, offsetY, width, height,
     ren:addPoint(cX + sX / 4, cY - tip)
     ren:addPoint(cX + sX / 4, cY)
     ren:renderPolygon()
+
+    local text = string.format("%.2fV", largestDiff)
+    local textWidth = lcd.getTextWidth(FONT_MINI, text)
+    lcd.drawText(cX + (sX - textWidth) / 2, cY + sY - textHeight, text, FONT_MINI)
+	local avgText = string.format("%.2fV", cellAvg)
+	textWidth = lcd.getTextWidth(FONT_MINI, avgText)
+    lcd.drawText(cX + (sX - textWidth) / 2, cY + sY - textHeight * 2, avgText, FONT_MINI)
 end
 
 function primitives.renderCellGraph(ren, offsetX, offsetY, width, height, cells, avg, maxDev)
@@ -227,12 +301,12 @@ function primitives.renderCellGraph(ren, offsetX, offsetY, width, height, cells,
         if (diff < 0) then
             lcd.drawText(
                 mX + 2, 
-                mY + (scY - lcd.getTextHeight(FONT_MINI, text)) / 2, 
+                mY + (scY - lcd.getTextHeight(FONT_MINI)) / 2, 
                 text, FONT_MINI)
         else
             lcd.drawText(
                 mX - 2 - lcd.getTextWidth(FONT_MINI, text), 
-                mY + (scY - lcd.getTextHeight(FONT_MINI, text)) / 2, 
+                mY + (scY - lcd.getTextHeight(FONT_MINI)) / 2, 
                 text, FONT_MINI)
         end
     end
@@ -259,6 +333,13 @@ local function sensorMul6sChanged(value)
     if (value > 0) then
         sensors.mul6s.id = sensorsAvailable[value].id
         system.pSave("mulSensorId", sensors.mul6s.id)
+    end
+end
+
+local function sensorMul6sModuleChanged(value)
+    if (value > 0) then
+        sensors.mul6smodule.id = sensorsAvailable[value].id
+        system.pSave("mulModuleSensorId", sensors.mul6smodule.id)
     end
 end
 
@@ -324,6 +405,7 @@ local function initForm(formId)
     local list = {}
     sensors.mui.curIndex = -1
     sensors.mul6s.curIndex = -1
+    sensors.mul6smodule.curIndex = -1
     sensors.rpm.curIndex = -1
     sensors.throttle.curIndex = -1
     sensors.temp.curIndex = -1
@@ -344,6 +426,9 @@ local function initForm(formId)
             end
             if (sensor.id == sensors.mul6s.id) then
                 sensors.mul6s.curIndex = #sensorsAvailable
+            end
+            if (sensor.id == sensors.mul6smodule.id) then
+                sensors.mul6smodule.curIndex = #sensorsAvailable
             end
         else
             local sensDesc = string.format("%s - %s [%s]", descr, sensor.label, sensor.unit)
@@ -382,6 +467,9 @@ local function initForm(formId)
         form.addRow(2)
         form.addLabel({label = "Select MUL6S Sensor"})
         form.addSelectbox(list, sensors.mul6s.curIndex, true, sensorMul6sChanged)
+        form.addRow(2)
+        form.addLabel({label = "Select MUL6S-M Sensor"})
+        form.addSelectbox(list, sensors.mul6smodule.curIndex, true, sensorMul6sModuleChanged)
         form.addRow(2)
         form.addLabel({label = "Select Throttle Sensor"})
         form.addSelectbox(list, sensors.throttle.curIndex, true, throttleChanged)
@@ -433,18 +521,24 @@ local function renderTelemetry(width, height)
         escAVal = sensors.mui.values.current
         batVal = battery.capacity - sensors.mui.values.capacity
     end
-    if (sensors.mul6s.valid) then
-        cellVal = sensors.mul6s.values
-        cellAvg = sensors.mul6s.total / sensors.mul6s.cellCount, 0.07
-        primitives.renderCellGraph(ren, szX * 3, 0, szX / 2, szY * 2, cellVal, cellAvg, 0.07)
-        vMax = sensors.mul6s.cellCount * 4.2
-        vMin = sensors.mul6s.cellCount * 3.4
+	if (sensors.mul6smodule.valid) then
+		primitives.renderBatteryCellGauge(ren, szX * 3, 0, szX / 2, szY * 2, sensors.mul6smodule.totalVoltage, 
+			sensors.mul6smodule.noOfCells, sensors.mul6smodule.largestDiff, sensors.mul6smodule.weakestCell)
+	end
+	if (sensors.mul6s.valid) then
+		cellVal = sensors.mul6s.values
+		cellAvg = sensors.mul6s.total / sensors.mul6s.cellCount, 0.07
+		primitives.renderCellGraph(ren, szX * 3, 0, szX / 2, szY * 2, cellVal, cellAvg, 0.07)
+		vMax = sensors.mul6s.cellCount * lipoMax
+		vMin = sensors.mul6s.cellCount * lipoMin
     else 
-        vMax = battery.cellCount * 4.2
-        vMin = battery.cellCount * 3.4
+        vMax = battery.cellCount * lipoMax
+        vMin = battery.cellCount * lipoMin
+    end
+	if (not sensors.mul6s.valid and not sensors.mul6smodule.valid) then
         battcX = szX * 3
         battszX = szX
-    end
+	end
 
     primitives.renderGauge2(ren, 90, 330, szX * 2, 0, szX, szY, vVal, vMin, vMax, "%.1fV", "ESC V", false, "") 
     primitives.renderGauge2(ren, 90, 330, szX * 2, szY, szX, szY, escAVal, 0, escAMax, "%.1fA", "ESC A", false, "") 
@@ -486,6 +580,41 @@ local function getSensors()
         sensors.mul6s.total = cellSum
         sensors.mul6s.cellCount = #sensors.mul6s.values
     end
+
+    -- MUL6S-M
+    if (sensors.mul6smodule.id ~= 0) then
+        sensors.mul6smodule.valid = true
+        local sensor = system.getSensorByID(sensors.mul6smodule.id, 1)
+        if (sensor and sensor.valid) then
+            sensors.mul6smodule.totalVoltage = sensor.value
+        else
+            sensors.mul6smodule.valid = false
+        end
+        sensor = system.getSensorByID(sensors.mul6smodule.id, 2)
+        if (sensor and sensor.valid) then
+            sensors.mul6smodule.noOfCells = sensor.value
+        else
+            sensors.mul6smodule.valid = false
+        end
+        sensor = system.getSensorByID(sensors.mul6smodule.id, 3)
+        if (sensor and sensor.valid) then
+            sensors.mul6smodule.lowestVoltage = sensor.value
+        else
+            sensors.mul6smodule.valid = false
+        end
+        sensor = system.getSensorByID(sensors.mul6smodule.id, 4)
+        if (sensor and sensor.valid) then
+            sensors.mul6smodule.largestDiff = sensor.value
+        else
+            sensors.mul6smodule.valid = false
+        end
+        sensor = system.getSensorByID(sensors.mul6smodule.id, 5)
+        if (sensor and sensor.valid) then
+            sensors.mul6smodule.weakestCell = sensor.value
+        else
+            sensors.mul6smodule.valid = false
+        end
+    end    
 
     -- RPM
     if (sensors.rpm.id ~= 0 and sensors.rpm.paramId ~= 0) then
@@ -536,8 +665,11 @@ end
 
 -- Application initialization.
 local function init(code)
+    sensors.mul6smodule = { id = system.pLoad("mulModuleSensorId", 0), valid = false, totalVoltage = 0, noOfCells = 0, lowestVoltage = 0, largestDiff = 0, weakestCell = 0 }
+    --sensors.mul6smodule = { id = system.pLoad("mulModuleSensorId", 0), valid = true, totalVoltage = 25.2, noOfCells = 6, lowestVoltage = 3.2, largestDiff = 0.1, weakestCell = 5 }
     sensors.mul6s = { id = system.pLoad("mulSensorId", 0), valid = false, cellCount = 0, values = {} }
     sensors.mui = { id = system.pLoad("muiSensorId", 0), valid = false, values = { voltage = 0, current = 0, capacity = 0} } 
+    --sensors.mui = { id = system.pLoad("muiSensorId", 0), valid = true, values = { voltage = 25.2, current = 12, capacity = 1100} } 
     sensors.rpm = { id = system.pLoad("rpmSensorId", 0), paramId = system.pLoad("rpmSensorParamId", 0), valid = false, value = 0}
     sensors.throttle = { id = system.pLoad("throttleSensorId", 0), paramId = system.pLoad("throttleSensorParamId", 0), valid = false, value = 0}
     sensors.temp = { id = system.pLoad("tempSensorId", 0), paramId = system.pLoad("tempSensorParamId", 0), valid = false, value = 0}
@@ -556,4 +688,4 @@ end
    
 -- Application interface
 setLanguage()
-return {init = init, loop = getSensors, author = "Marc Marais", version = "0.1", name = "Flight HUD"}
+return {init = init, loop = getSensors, author = "Marc Marais", version = "0.2", name = "Flight HUD"}
