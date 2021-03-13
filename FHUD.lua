@@ -322,13 +322,6 @@ local function setLanguage()
     end
 end
 
-local function sensorMuiChanged(value)
-    if (value > 0) then
-        sensors.mui.id = sensorsAvailable[value].id
-        system.pSave("muiSensorId", sensors.mui.id)
-    end
-end
-
 local function sensorMul6sChanged(value)
     if (value > 0) then
         sensors.mul6s.id = sensorsAvailable[value].id
@@ -391,6 +384,33 @@ local function govSensorChanged(value)
     end
 end
 
+local function escASensorChanged(value)
+    if (value > 0) then
+        sensors.escA.id = sensorsAvailable[value].id
+        sensors.escA.paramId = sensorsAvailable[value].param
+        system.pSave("escASensorId", sensors.escA.id)
+        system.pSave("escASensorParamId", sensors.escA.paramId)
+    end
+end
+
+local function escVSensorChanged(value)
+    if (value > 0) then
+        sensors.escV.id = sensorsAvailable[value].id
+        sensors.escV.paramId = sensorsAvailable[value].param
+        system.pSave("escVSensorId", sensors.escV.id)
+        system.pSave("escVSensorParamId", sensors.escV.paramId)
+    end
+end
+
+local function capacitySensorChanged(value)
+    if (value > 0) then
+        sensors.capacity.id = sensorsAvailable[value].id
+        sensors.capacity.paramId = sensorsAvailable[value].param
+        system.pSave("capacitySensorId", sensors.capacity.id)
+        system.pSave("capacitySensorParamId", sensors.capacity.paramId)
+    end
+end
+
 local function throttleChanged(value)
     if (value > 0) then
         sensors.throttle.id = sensorsAvailable[value].id
@@ -403,7 +423,6 @@ end
 -- Initialise form (configuration)
 local function initForm(formId)
     local list = {}
-    sensors.mui.curIndex = -1
     sensors.mul6s.curIndex = -1
     sensors.mul6smodule.curIndex = -1
     sensors.rpm.curIndex = -1
@@ -421,9 +440,6 @@ local function initForm(formId)
             descr = sensor.label
             list[#list+1] = sensor.label
             sensorsAvailable[#sensorsAvailable+1] = sensor
-            if (sensor.id == sensors.mui.id) then
-                sensors.mui.curIndex = #sensorsAvailable
-            end
             if (sensor.id == sensors.mul6s.id) then
                 sensors.mul6s.curIndex = #sensorsAvailable
             end
@@ -447,6 +463,15 @@ local function initForm(formId)
             if (sensor.id == sensors.gov.id and sensor.param == sensors.gov.paramId) then
                 sensors.gov.curIndex = #sensorsAvailable
             end
+            if (sensor.id == sensors.escA.id and sensor.param == sensors.escA.paramId) then
+                sensors.escA.curIndex = #sensorsAvailable
+            end
+            if (sensor.id == sensors.escV.id and sensor.param == sensors.escV.paramId) then
+                sensors.escV.curIndex = #sensorsAvailable
+            end
+            if (sensor.id == sensors.capacity.id and sensor.param == sensors.capacity.paramId) then
+                sensors.capacity.curIndex = #sensorsAvailable
+            end
         end
     end
 
@@ -461,9 +486,6 @@ local function initForm(formId)
     form.addIntbox(battery.cellCount, 1, 15, 6, 0, 1, cellCountChanged)
     form.addSpacer(100,10)
     if (#list > 0) then
-        form.addRow(2)
-        form.addLabel({label = "Select MUI Sensor"})
-        form.addSelectbox(list, sensors.mui.curIndex, true, sensorMuiChanged)
         form.addRow(2)
         form.addLabel({label = "Select MUL6S Sensor"})
         form.addSelectbox(list, sensors.mul6s.curIndex, true, sensorMul6sChanged)
@@ -482,6 +504,15 @@ local function initForm(formId)
         form.addRow(2)
         form.addLabel({label = "Select Gov Sensor"})
         form.addSelectbox(list, sensors.gov.curIndex, true, govSensorChanged)
+        form.addRow(2)
+        form.addLabel({label = "Select ESC A Sensor"})
+        form.addSelectbox(list, sensors.escA.curIndex, true, escASensorChanged)
+        form.addRow(2)
+        form.addLabel({label = "Select ESC V Sensor"})
+        form.addSelectbox(list, sensors.escV.curIndex, true, escVSensorChanged)
+        form.addRow(2)
+        form.addLabel({label = "Select Capacity Sensor"})
+        form.addSelectbox(list, sensors.capacity.curIndex, true, capacitySensorChanged)
     end
 end
 
@@ -506,9 +537,9 @@ local function renderTelemetry(width, height)
 
     local cellVal = {}
     local cellAvg = 0
-    local vVal = 0
-    local vMax = 0
-    local vMin = 0
+    local escV = 0
+    local escVMax = 0
+    local escVMin = 0
     local escAVal = 0
     local escAMax = battery.escMaxA
     local battcX = szX * 3 + szX / 2
@@ -516,10 +547,14 @@ local function renderTelemetry(width, height)
     local batVal = 0
     local batMax = battery.capacity
 
-    if (sensors.mui.valid) then
-        vVal = sensors.mui.values.voltage
-        escAVal = sensors.mui.values.current
-        batVal = battery.capacity - sensors.mui.values.capacity
+    if (sensors.capacity.valid) then
+        batVal = battery.capacity - sensors.capacity.value
+    end
+    if (sensors.escV.valid) then
+        escV = sensors.escV.value 
+    end
+    if (sensors.escA.valid) then
+        escAVal = sensors.escA.value
     end
 	if (sensors.mul6smodule.valid) then
 		primitives.renderBatteryCellGauge(ren, szX * 3, 0, szX / 2, szY * 2, sensors.mul6smodule.totalVoltage, 
@@ -540,31 +575,12 @@ local function renderTelemetry(width, height)
         battszX = szX
 	end
 
-    primitives.renderGauge2(ren, 90, 330, szX * 2, 0, szX, szY, vVal, vMin, vMax, "%.1fV", "ESC V", false, "") 
+    primitives.renderGauge2(ren, 90, 330, szX * 2, 0, szX, szY, escV, escVMin, escVMax, "%.1fV", "ESC V", false, "") 
     primitives.renderGauge2(ren, 90, 330, szX * 2, szY, szX, szY, escAVal, 0, escAMax, "%.1fA", "ESC A", false, "") 
     primitives.renderBatteryGauge(ren, battcX, 0, battszX, szY * 2, batVal, batMax)
 end
 
 local function getSensors()
-    --- MUI
-    if (sensors.mui.id ~= 0) then
-        local v = system.getSensorByID(sensors.mui.id, 1)
-        if (v and v.valid) then
-            sensors.mui.values.voltage = v.value
-            sensors.mui.valid = true
-        end
-        local a = system.getSensorByID(sensors.mui.id, 2)
-        if (a and a.valid) then
-            sensors.mui.values.current = a.value
-            sensors.mui.valid = true
-        end
-        local c = system.getSensorByID(sensors.mui.id, 3)
-        if (c and c.valid) then
-            sensors.mui.values.capacity = c.value
-            sensors.mui.valid = true
-        end
-    end
-
     --- MUL6S
     if (sensors.mul6s.id ~= 0) then 
         sensors.mul6s.values = {}
@@ -584,36 +600,27 @@ local function getSensors()
     -- MUL6S-M
     if (sensors.mul6smodule.id ~= 0) then
         sensors.mul6smodule.valid = true
-        local sensor = system.getSensorByID(sensors.mul6smodule.id, 1)
-        if (sensor and sensor.valid) then
-            sensors.mul6smodule.totalVoltage = sensor.value
-        else
-            sensors.mul6smodule.valid = false
+        local sensor1 = system.getSensorByID(sensors.mul6smodule.id, 1)
+        if (sensor1 and sensor1.valid) then
+            sensors.mul6smodule.totalVoltage = sensor1.value
         end
-        sensor = system.getSensorByID(sensors.mul6smodule.id, 2)
-        if (sensor and sensor.valid) then
-            sensors.mul6smodule.noOfCells = sensor.value
-        else
-            sensors.mul6smodule.valid = false
+        local sensor2 = system.getSensorByID(sensors.mul6smodule.id, 2)
+        if (sensor2 and sensor2.valid) then
+            sensors.mul6smodule.noOfCells = sensor2.value
         end
-        sensor = system.getSensorByID(sensors.mul6smodule.id, 3)
-        if (sensor and sensor.valid) then
-            sensors.mul6smodule.lowestVoltage = sensor.value
-        else
-            sensors.mul6smodule.valid = false
+        local sensor3 = system.getSensorByID(sensors.mul6smodule.id, 3)
+        if (sensor3 and sensor3.valid) then
+            sensors.mul6smodule.lowestVoltage = sensor3.value
         end
-        sensor = system.getSensorByID(sensors.mul6smodule.id, 4)
-        if (sensor and sensor.valid) then
-            sensors.mul6smodule.largestDiff = sensor.value
-        else
-            sensors.mul6smodule.valid = false
+        local sensor4 = system.getSensorByID(sensors.mul6smodule.id, 4)
+        if (sensor4 and sensor4.valid) then
+            sensors.mul6smodule.largestDiff = sensor4.value
         end
-        sensor = system.getSensorByID(sensors.mul6smodule.id, 5)
-        if (sensor and sensor.valid) then
-            sensors.mul6smodule.weakestCell = sensor.value
-        else
-            sensors.mul6smodule.valid = false
+        local sensor5 = system.getSensorByID(sensors.mul6smodule.id, 5)
+        if (sensor5 and sensor5.valid) then
+            sensors.mul6smodule.weakestCell = sensor5.value
         end
+        sensors.mul6smodule.valid = sensor1.valid and sensor2.valid and sensor3.valid and sensor4.valid and sensor5.valid
     end    
 
     -- RPM
@@ -643,7 +650,34 @@ local function getSensors()
         end
     end
 
-    -- BEC
+    -- ESC A
+    if (sensors.escA.id ~= 0 and sensors.escA.paramId ~= 0) then
+        local escA = system.getSensorByID(sensors.escA.id, sensors.escA.paramId)
+        if (escA and escA.valid) then
+            sensors.escA.value = escA.value
+            sensors.escA.valid = true
+        end
+    end
+
+    -- ESC V
+    if (sensors.escV.id ~= 0 and sensors.escV.paramId ~= 0) then
+        local escV = system.getSensorByID(sensors.escV.id, sensors.escV.paramId)
+        if (escV and escV.valid) then
+            sensors.escV.value = escV.value
+            sensors.escV.valid = true
+        end
+    end
+
+    -- capacity
+    if (sensors.capacity.id ~= 0 and sensors.capacity.paramId ~= 0) then
+        local escV = system.getSensorByID(sensors.capacity.id, sensors.capacity.paramId)
+        if (capacity and capacity.valid) then
+            sensors.capacity.value = capacity.value
+            sensors.capacity.valid = true
+        end
+    end
+
+    -- BEC V
     local txTel = system.getTxTelemetry()
     if (txTel ~= nil and txTel.rx1Voltage ~= nill) then
         sensors.becV.value = txTel.rx1Voltage
@@ -663,23 +697,42 @@ end
 local function printForm()
 end
 
--- Application initialization.
-local function init(code)
-    sensors.mul6smodule = { id = system.pLoad("mulModuleSensorId", 0), valid = false, totalVoltage = 0, noOfCells = 0, lowestVoltage = 0, largestDiff = 0, weakestCell = 0 }
-    --sensors.mul6smodule = { id = system.pLoad("mulModuleSensorId", 0), valid = true, totalVoltage = 25.2, noOfCells = 6, lowestVoltage = 3.2, largestDiff = 0.1, weakestCell = 5 }
-    sensors.mul6s = { id = system.pLoad("mulSensorId", 0), valid = false, cellCount = 0, values = {} }
-    sensors.mui = { id = system.pLoad("muiSensorId", 0), valid = false, values = { voltage = 0, current = 0, capacity = 0} } 
-    --sensors.mui = { id = system.pLoad("muiSensorId", 0), valid = true, values = { voltage = 25.2, current = 12, capacity = 1100} } 
-    sensors.rpm = { id = system.pLoad("rpmSensorId", 0), paramId = system.pLoad("rpmSensorParamId", 0), valid = false, value = 0}
-    sensors.throttle = { id = system.pLoad("throttleSensorId", 0), paramId = system.pLoad("throttleSensorParamId", 0), valid = false, value = 0}
-    sensors.temp = { id = system.pLoad("tempSensorId", 0), paramId = system.pLoad("tempSensorParamId", 0), valid = false, value = 0}
-    sensors.becV = { valid = false, value = 0}
-    sensors.gov = { id = system.pLoad("govSensorId", 0), paramId = system.pLoad("govSensorParamId", 0), valid = false, value = 0}
+local function initSensors() 
+    sensors.mul6s = { id = system.pLoad("mulSensorId", 0), valid = false, cellCount = 0, values = {}, curIndex = 0 }
+    sensors.mul6smodule = { id = system.pLoad("mulModuleSensorId", 0), valid = false, totalVoltage = 0, noOfCells = 0, lowestVoltage = 0, largestDiff = 0, weakestCell = 0, curIndex = 0 }
+    sensors.rpm = { id = system.pLoad("rpmSensorId", 0), paramId = system.pLoad("rpmSensorParamId", 0), valid = false, value = 0, curIndex = 0}
+    sensors.throttle = { id = system.pLoad("throttleSensorId", 0), paramId = system.pLoad("throttleSensorParamId", 0), valid = false, value = 0, curIndex = 0}
+    sensors.temp = { id = system.pLoad("tempSensorId", 0), paramId = system.pLoad("tempSensorParamId", 0), valid = false, value = 0, curIndex = 0}
+    sensors.becV = { valid = false, value = 0, curIndex = 0}
+    sensors.gov = { id = system.pLoad("govSensorId", 0), paramId = system.pLoad("govSensorParamId", 0), valid = false, value = 0, curIndex = 0}
+    sensors.escA = { id = system.pLoad("escASensorId", 0), paramId = system.pLoad("escASensorParamId", 0), valid = false, value = 0, curIndex = 0}
+    sensors.escV = { id = system.pLoad("escVSensorId", 0), paramId = system.pLoad("escVSensorParamId", 0), valid = false, value = 0, curIndex = 0}
+    sensors.capacity = { id = system.pLoad("capacitySensorId", 0), paramId = system.pLoad("capacitySensorParamId", 0), valid = false, value = 0, curIndex = 0}
+end
 
+local function initSensors_test() 
+    sensors.mul6s = { id = system.pLoad("mulSensorId", 0), valid = true, cellCount = 6, total = 25.0, values = {4.1,4.2,4.1,4.2,4.2,4.2}, curIndex = 0 }
+    sensors.mul6smodule = { id = system.pLoad("mulModuleSensorId", 0), valid = false, totalVoltage = 25.0, noOfCells = 6, lowestVoltage = 3.2, largestDiff = 0.1, weakestCell = 5 }
+    sensors.rpm = { id = system.pLoad("rpmSensorId", 0), paramId = system.pLoad("rpmSensorParamId", 0), valid = true, value = 2000, curIndex = 0}
+    sensors.throttle = { id = system.pLoad("throttleSensorId", 0), paramId = system.pLoad("throttleSensorParamId", 0), valid = true, value = 80, curIndex = 0}
+    sensors.temp = { id = system.pLoad("tempSensorId", 0), paramId = system.pLoad("tempSensorParamId", 0), valid = true, value = 75, curIndex = 0}
+    sensors.becV = { valid = true, value = 7.5, curIndex = 0}
+    sensors.gov = { id = system.pLoad("govSensorId", 0), paramId = system.pLoad("govSensorParamId", 0), valid = false, value = 0, curIndex = 0}
+    sensors.escA = { id = system.pLoad("escASensorId", 0), paramId = system.pLoad("escASensorParamId", 0), valid = true, value = 45, curIndex = 0}
+    sensors.escV = { id = system.pLoad("escVSensorId", 0), paramId = system.pLoad("escVSensorParamId", 0), valid = true, value = 25.0, curIndex = 0}
+    sensors.capacity = { id = system.pLoad("capacitySensorId", 0), paramId = system.pLoad("capacitySensorParamId", 0), valid = true, value = 1100, curIndex = 0}
+end
+
+local function initBattery() 
     battery.capacity = system.pLoad("capacity", 2200)
     battery.escMaxA = system.pLoad("escMaxA", 60)
     battery.cellCount = system.pLoad("cellCount", 6)
+end
 
+-- Application initialization.
+local function init(code)
+    initSensors()
+    initBattery()
     system.registerTelemetry(1, "Flight HUD", 4, renderTelemetry) 
     system.registerForm(1, MENU_TELEMETRY, "Flight HUD", initForm, nil, printForm)
     print ("Application initialized")
@@ -688,4 +741,4 @@ end
    
 -- Application interface
 setLanguage()
-return {init = init, loop = getSensors, author = "Marc Marais", version = "0.2", name = "Flight HUD"}
+return {init = init, loop = getSensors, author = "Marc Marais", version = "0.3", name = "Flight HUD"}
