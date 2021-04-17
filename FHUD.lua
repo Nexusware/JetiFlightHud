@@ -670,7 +670,7 @@ local function getSensors()
 
     -- capacity
     if (sensors.capacity.id ~= 0 and sensors.capacity.paramId ~= 0) then
-        local escV = system.getSensorByID(sensors.capacity.id, sensors.capacity.paramId)
+        local capacity = system.getSensorByID(sensors.capacity.id, sensors.capacity.paramId)
         if (capacity and capacity.valid) then
             sensors.capacity.value = capacity.value
             sensors.capacity.valid = true
